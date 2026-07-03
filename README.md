@@ -117,6 +117,7 @@ read-content-digest/
 read-feishu-doc/
 read-ocr/
 read-personal-data-harvester/
+read-podcast-script-generator/
 read-podcast-workflow/
 read-rss-aggregator/
 read-topic-collector/
@@ -125,6 +126,7 @@ read-web-article-translator/
 read-web-scraper/
 read-x-blogger-analyzer/
 read-x-markdown/
+read-xiaoyuzhou-article/
 read-youtube-feed/
 read-youtube-transcript/
 ```
@@ -156,6 +158,14 @@ Read Buddy 内所有 Skill 都统一使用 `read-*` 命名，目录名与 `SKILL
 
 ```text
 提取这个 YouTube 视频的中文字幕
+```
+
+```text
+把这个小宇宙单集转成文章
+```
+
+```text
+把这篇播客摘要改成口播脚本
 ```
 
 ```text
@@ -194,6 +204,8 @@ Read Buddy 内所有 Skill 都统一使用 `read-*` 命名，目录名与 `SKILL
 | `read-youtube-feed` | 获取关注 YouTube 博主/播客的近期更新 | 更新列表 |
 | `read-youtube-transcript` | 提取 YouTube 字幕并转成中文文字稿 | Markdown / text / JSON |
 | `read-podcast-workflow` | YouTube 播客更新选择、字幕提取、内容消化、飞书保存 | 工作流产物 |
+| `read-podcast-script-generator` | 播客笔记、摘要、文稿改写成视频口播脚本 | 口播脚本 |
+| `read-xiaoyuzhou-article` | 小宇宙单集音频下载、Groq Whisper 转录、整理成文章 | 文稿 + 文章 |
 | `read-rss-aggregator` | 聚合 OPML 中的 RSS 源近期更新 | 更新摘要列表 |
 | `read-topic-collector` | 采集 AI 热点、产品发布、论文、博客和社区动态 | 结构化热点清单 |
 | `read-content-digest` | 长文、播客、访谈、文章转短帖和长文叙事 | 摘要 / 短帖 / 长文 |
@@ -209,6 +221,8 @@ Read Buddy 内所有 Skill 都统一使用 `read-*` 命名，目录名与 `SKILL
 | --- | --- | --- |
 | URL 读取 | `把这个网页转 Markdown`、`保存这篇文章` | 读取网页正文、清理噪声、输出 Markdown |
 | 视频/播客 | `提取这个 YouTube 字幕`、`处理这个播客` | 拉字幕、生成文字稿、可继续摘要和入库 |
+| 小宇宙播客 | `小宇宙转文字`、`把这个小宇宙链接转成文章` | 下载音频、切片转录、生成文稿和文章 |
+| 口播脚本 | `改成口播`、`生成播客脚本` | 把播客摘要改写成第一人称视频脚本 |
 | 信息流更新 | `最近 RSS 有什么`、`获取播客更新` | 聚合 RSS 或 YouTube 关注源 |
 | 热点采集 | `开始今日选题`、`今日 AI 热点` | 多源搜索并生成结构化热点列表 |
 | 内容消化 | `总结这篇长文`、`生成短帖和长文版` | 提炼观点、反共识、金句和叙事结构 |
@@ -233,7 +247,8 @@ Read Buddy 不是一个单一爬虫，而是一组信息读取和消化 Skill。
 常见分支：
 
 - 网页读取：优先用轻量抓取，遇到登录态或 JS 渲染页面时使用 Chrome CDP。
-- 视频播客：先获取更新或字幕，再交给 `read-content-digest` 做观点提炼。
+- 视频播客：先获取更新或字幕，再交给 `read-content-digest` 做观点提炼；小宇宙单集可走 `read-xiaoyuzhou-article` 下载音频并转写。
+- 口播创作：播客摘要或结构化笔记可交给 `read-podcast-script-generator` 改成视频口播稿。
 - 热点采集：先收集多源链接，再按来源、主题和选题价值整理。
 - X 内容：能手动就手动，自动抓取需要用户知情并接受反爬风险。
 - 个人数据：只处理用户自己的数据，默认本地保存，不上传。
@@ -243,7 +258,7 @@ Read Buddy 不是一个单一爬虫，而是一组信息读取和消化 Skill。
 - 自媒体作者：读网页、读视频、读热点，沉淀选题和素材
 - 研究者：聚合 RSS、论文、官方博客和访谈内容
 - 产品经理：追踪竞品动态、用户讨论、行业新闻
-- 播客听众：把 YouTube 播客转文字稿和摘要
+- 播客听众：把 YouTube / 小宇宙播客转文字稿、摘要、文章和口播脚本
 - 知识管理用户：把网页、飞书、个人历史数据转成本地知识库
 - 内容运营：分析 X 博主、热点来源和内容风格
 
@@ -256,6 +271,7 @@ Read Buddy 的定位是公开内容读取、个人数据整理和知识消化，
 - 凭据不入库：飞书 app secret、Cookie、API Key、`.env`、浏览器登录态和个人数据库都不应提交到仓库。
 - X 风险提示：`read-x-markdown` 使用非官方接口，必须先获得用户同意，并告知可能失效或触发平台限制。
 - 个人数据本地化：`read-personal-data-harvester` 默认只在用户设备上采集和保存，不上传到第三方。
+- 小宇宙转写：`read-xiaoyuzhou-article` 需要 `ffmpeg` 和 `GROQ_API_KEY`，音频下载与转录应仅用于你有权处理的内容。
 - 低频采样：RSS、网页、YouTube、X 等来源应低频、按需读取，避免给平台造成压力。
 - 分享前脱敏：报告和 Markdown 发布前移除 Cookie、token、邮箱、手机号、私密链接和未公开账号信息。
 
@@ -266,7 +282,7 @@ Read Buddy 的定位是公开内容读取、个人数据整理和知识消化，
 - 不是实时全网监控：RSS、搜索、YouTube 和网页结果都受来源更新和接口限制影响。
 - 抓取不保证成功：登录、验证码、Cloudflare、JS 渲染、反爬和地区限制都可能失败。
 - OCR 会出错：低清图片、复杂表格、手写体和多语言混排需要人工复核。
-- 自动摘要不等于原文：`read-content-digest` 会压缩和重组观点，关键事实仍应回看原文。
+- 自动摘要和口播脚本不等于原文：`read-content-digest` / `read-podcast-script-generator` 会压缩、重组和改写观点，关键事实仍应回看原始文稿。
 - X 自动抓取成功率低：推荐用户手动复制内容再分析。
 - 个人数据采集需要授权：只能处理用户自己的数据，不能替代平台导出或合规审查。
 
@@ -274,7 +290,7 @@ Read Buddy 的定位是公开内容读取、个人数据整理和知识消化，
 
 ## 参考
 
-Read Buddy 汇集并整理了多个信息获取、内容读取、转写、翻译、摘要和个人数据采集 Skill。
+Read Buddy 汇集并整理了多个信息获取、内容读取、转写、翻译、摘要和个人数据采集 Skill。其中播客链路整合了 [SpaceZephyr/onepod-Skill](https://github.com/SpaceZephyr/onepod-Skill) 的 YouTube / 小宇宙处理能力。
 
 其中部分 Skill 依赖 Chrome CDP、Feishu Open API、YouTube transcript、OCR API、RSS feed、Playwright 或本地脚本，具体依赖以各目录的 `SKILL.md` 和 `scripts/` 为准。
 

@@ -5,7 +5,7 @@
 """
 
 import requests
-import xml.etree.ElementTree as ET
+import re
 from datetime import datetime, timedelta
 import argparse
 import json
@@ -45,62 +45,162 @@ CHANNELS = [
     ("The AI Daily Brief", "UCIAtPXNxXPKmw-_1sYnrJzQ", "@TheAIDailyBrief"),
     ("TBPN", "UCQvWX73GQygcwXOTSf_VDVg", "@TBPNLive"),
     ("Brett Malinowski", "UCMR-rPSUI34DRQXUkvFuIUQ", "@TheBrettWay"),
+
+    # === 投资 & 商业访谈 ===
+    ("Invest Like the Best", "UCpQBb0fToph3jrDulwz1iUQ", "@ILTB_Podcast"),
+    ("The All-In Podcast", "UCESLZhusAkFfsNsApnjF_Cg", "@allin"),
+    ("Acquired", "UCyFqFYfTW2VoIQKylJ04Rtw", "@AcquiredFM"),
+    ("CNBC Television", "UCvJJ_dzjViJCoLf5uKUTwoA", "@CNBCtelevision"),
+
+    # === 深度访谈 ===
+    ("Dwarkesh Patel", "UCZa18YV7qayTh-MRIrBhDpA", "@DwarkeshPatel"),
+    ("Core Memory (Ashlee Vance)", "UCzWnSedVeqUyze_R6M5BqwA", "@CoreMemoryVideos"),
+    ("Joseph Noel Walker", "UCQ5Rjt_Vcy8D1ineFBY4y_Q", "@josephnoelwalker"),
+    ("The Information Bottleneck", "UCFPYHur5LvervD60Aba-9cw", "@information_bottleneck"),
+
+    # === 写作 & 思考 ===
+    ("How I Write (David Perell)", "UC0a_pO439rhcyHBZq3AKdrw", "@DavidPerellChannel"),
+
+    # === 健康 & 科学 ===
+    ("Huberman Lab", "UC2D2CMWXMOVWx7giW1n3LIg", "@hubermanlab"),
 ]
 
 
-def get_channel_feed(channel_id):
-    """获取频道的 RSS feed"""
-    url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+BROWSER_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Cookie': 'CONSENT=YES+1; PREF=hl=en&gl=US',
+}
+
+
+def fetch_channel_page(handle):
+    """抓取 @handle/videos 页面 HTML"""
+    h = handle.lstrip('@')
+    url = f"https://www.youtube.com/@{h}/videos"
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, headers=BROWSER_HEADERS, timeout=15)
         if response.status_code == 200:
             return response.text
     except Exception as e:
-        print(f"获取 feed 失败: {e}")
+        print(f"获取频道页失败 {handle}: {e}")
     return None
 
 
-def parse_feed(xml_content, channel_name, days=2):
-    """解析 RSS feed，获取最近 N 天的视频"""
+_RELATIVE_RE = re.compile(r'(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago', re.IGNORECASE)
+_UNIT_DAYS = {
+    'second': 0, 'minute': 0, 'hour': 0,
+    'day': 1, 'week': 7, 'month': 30, 'year': 365,
+}
+
+
+def parse_relative_time(text):
+    """将 'N units ago' 字符串转换为发布日期。无法解析返回 None。"""
+    if not text:
+        return None
+    m = _RELATIVE_RE.search(text)
+    if not m:
+        return None
+    n = int(m.group(1))
+    unit = m.group(2).lower()
+    days_ago = n * _UNIT_DAYS.get(unit, 0)
+    return datetime.now() - timedelta(days=days_ago)
+
+
+def parse_channel_page(html, channel_name, days=2):
+    """从频道页 ytInitialData 中提取最近 N 天的视频"""
     videos = []
-    cutoff_date = datetime.now() - timedelta(days=days)
-    
+    if not html:
+        return videos
+    m = re.search(r'var ytInitialData = (\{.*?\});</script>', html)
+    if not m:
+        return videos
     try:
-        root = ET.fromstring(xml_content)
-        ns = {'atom': 'http://www.w3.org/2005/Atom', 
-              'media': 'http://search.yahoo.com/mrss/',
-              'yt': 'http://www.youtube.com/xml/schemas/2015'}
-        
-        for entry in root.findall('atom:entry', ns):
-            published = entry.find('atom:published', ns)
-            if published is not None:
-                pub_date = datetime.fromisoformat(published.text.replace('Z', '+00:00'))
-                pub_date_naive = pub_date.replace(tzinfo=None)
-                
-                if pub_date_naive >= cutoff_date:
-                    title = entry.find('atom:title', ns)
-                    video_id = entry.find('yt:videoId', ns)
-                    
-                    # 获取视频描述信息
-                    media_group = entry.find('media:group', ns)
-                    description = ""
-                    if media_group is not None:
-                        desc_elem = media_group.find('media:description', ns)
-                        if desc_elem is not None and desc_elem.text:
-                            description = desc_elem.text[:1500]  # 获取更多描述以生成更详细的摘要
-                    
-                    videos.append({
-                        'channel': channel_name,
-                        'title': title.text if title is not None else 'Unknown',
-                        'video_id': video_id.text if video_id is not None else '',
-                        'published': pub_date_naive.strftime('%Y-%m-%d %H:%M'),
-                        'url': f"https://www.youtube.com/watch?v={video_id.text}" if video_id is not None else '',
-                        'description': description
-                    })
+        data = json.loads(m.group(1))
     except Exception as e:
-        print(f"解析失败: {e}")
-    
+        print(f"解析 ytInitialData 失败 {channel_name}: {e}")
+        return videos
+
+    tabs = data.get('contents', {}).get('twoColumnBrowseResultsRenderer', {}).get('tabs', [])
+    items = []
+    for tab in tabs:
+        tr = tab.get('tabRenderer', {})
+        if tr.get('selected') and tr.get('title', '').lower() == 'videos':
+            items = tr.get('content', {}).get('richGridRenderer', {}).get('contents', [])
+            break
+
+    cutoff = datetime.now() - timedelta(days=days)
+    for it in items:
+        lv = it.get('richItemRenderer', {}).get('content', {}).get('lockupViewModel', {})
+        if not lv:
+            continue
+        video_id = lv.get('contentId')
+        if not video_id:
+            continue
+        md = lv.get('metadata', {}).get('lockupMetadataViewModel', {})
+        title = md.get('title', {}).get('content', 'Unknown')
+
+        # metadata rows 通常是 [views, published]
+        rows = md.get('metadata', {}).get('contentMetadataViewModel', {}).get('metadataRows', [])
+        meta_parts = []
+        for r in rows:
+            for p in r.get('metadataParts', []):
+                txt = p.get('text', {}).get('content')
+                if txt:
+                    meta_parts.append(txt)
+
+        views = None
+        published_text = None
+        for part in meta_parts:
+            if 'ago' in part.lower():
+                published_text = part
+            elif 'view' in part.lower():
+                views = part
+
+        pub_date = parse_relative_time(published_text)
+        if pub_date is None or pub_date < cutoff:
+            continue
+
+        # duration
+        duration = None
+        ci = lv.get('contentImage', {}).get('thumbnailViewModel', {})
+        for ov in ci.get('overlays', []):
+            for b in ov.get('thumbnailBottomOverlayViewModel', {}).get('badges', []):
+                tb = b.get('thumbnailBadgeViewModel', {})
+                if tb.get('text'):
+                    duration = tb['text']
+
+        videos.append({
+            'channel': channel_name,
+            'title': title,
+            'video_id': video_id,
+            'published': pub_date.strftime('%Y-%m-%d %H:%M'),
+            'published_text': published_text or '',
+            'url': f"https://www.youtube.com/watch?v={video_id}",
+            'description': '',
+            'views': views or '',
+            'duration': duration or '',
+        })
     return videos
+
+
+def fetch_video_description(video_id):
+    """从视频页提取描述（用于摘要生成）"""
+    try:
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        response = requests.get(url, headers=BROWSER_HEADERS, timeout=10)
+        if response.status_code != 200:
+            return ''
+        m = re.search(r'ytInitialPlayerResponse\s*=\s*(\{.*?\});', response.text, re.DOTALL)
+        if m:
+            try:
+                data = json.loads(m.group(1))
+                desc = data.get('videoDetails', {}).get('shortDescription', '')
+                return desc[:1500]
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return ''
 
 
 def get_video_details(video_id):
@@ -252,27 +352,21 @@ def main():
     print(f"正在获取最近 {args.days} 天的播客更新...", file=sys.stderr)
     
     for name, channel_id, handle in CHANNELS:
-        feed = get_channel_feed(channel_id)
-        if feed:
-            videos = parse_feed(feed, name, args.days)
+        html = fetch_channel_page(handle)
+        if html:
+            videos = parse_channel_page(html, name, args.days)
             all_videos.extend(videos)
-    
+
     # 按发布时间排序
     all_videos.sort(key=lambda x: x['published'], reverse=True)
-    
-    # 添加摘要
+
+    # 抓取描述用于摘要（仅在窗口内的视频，数量有限）
+    print(f"正在抓取 {len(all_videos)} 个视频的描述...", file=sys.stderr)
+    import time
     for video in all_videos:
+        video['description'] = fetch_video_description(video['video_id'])
         video['summary'] = generate_summary(video['description'], video['title'])
-    
-    # 获取播放量和时长（可选）
-    if args.views:
-        print(f"正在获取播放量和时长...", file=sys.stderr)
-        import time
-        for video in all_videos:
-            details = get_video_details(video['video_id'])
-            video['views'] = details['views'] if details['views'] else '-'
-            video['duration'] = details['duration'] if details['duration'] else '-'
-            time.sleep(0.3)
+        time.sleep(0.2)
     
     if args.json:
         print(json.dumps(all_videos, ensure_ascii=False, indent=2))
