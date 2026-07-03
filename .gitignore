@@ -1,1 +1,8 @@
 .DS_Store
+**/.DS_Store
+.env
+**/.env
+*.log
+**/temp_*.txt
+**/temp_*.md
+**/*_transcript.md
