@@ -17,7 +17,7 @@
 
 Read Buddy 是一套给内容创作者、研究者、产品人和知识工作者用的信息读取 Skill 集合。
 
-它帮你把网页、RSS、YouTube、播客、X/Twitter、飞书文档、图片 OCR、个人阅读记录和热点信号，转成可读、可检索、可总结、可继续写作的结构化内容。
+它帮你把网页、RSS、YouTube、播客、X/Twitter、飞书文档、图片 OCR、微信读书、个人阅读记录和热点信号，转成可读、可检索、可总结、可继续写作的结构化内容。
 
 基于开放的 Agent Skills 协议，可在 Claude Code、Codex、Cursor、OpenClaw、Hermes Agent、CodeBuddy、Workbuddy、Gemini CLI、OpenCode 等兼容 runtime 中运行。
 
@@ -29,6 +29,7 @@ Read Buddy 是一套给内容创作者、研究者、产品人和知识工作者
 - 读 YouTube 字幕、播客更新和长内容
 - 读 RSS 和 AI 热点，形成每日信息面
 - 读飞书文档、图片/PDF OCR、个人历史数据
+- 读微信读书划线、书架和阅读数据，生成导出、分析和回顾
 - 读 X/Twitter 内容和博主风格，但明确反爬与同意边界
 - 把长内容消化成摘要、选题、长文或短帖
 
@@ -122,6 +123,9 @@ read-podcast-workflow/
 read-rss-aggregator/
 read-topic-collector/
 read-url-markdown/
+read-weread-analyzer/
+read-weread-coach/
+read-weread-export/
 read-web-article-translator/
 read-web-scraper/
 read-x-blogger-analyzer/
@@ -185,6 +189,14 @@ Read Buddy 内所有 Skill 都统一使用 `read-*` 命名，目录名与 `SKILL
 ```
 
 ```text
+导出我的微信读书划线
+```
+
+```text
+分析我的微信读书，生成阅读画像
+```
+
+```text
 把这张图里的文字 OCR 出来
 ```
 
@@ -211,6 +223,9 @@ Read Buddy 内所有 Skill 都统一使用 `read-*` 命名，目录名与 `SKILL
 | `read-content-digest` | 长文、播客、访谈、文章转短帖和长文叙事 | 摘要 / 短帖 / 长文 |
 | `read-feishu-doc` | 通过飞书开放 API 读取飞书文档和 blocks | 文档内容 / blocks JSON |
 | `read-ocr` | 图片、PDF、扫描件 OCR 识别 | 结构化 JSON / 文本 |
+| `read-weread-export` | 导出微信读书个人划线和想法，支持 Markdown / PDF | 读书笔记文件 |
+| `read-weread-analyzer` | 基于书架、阅读时长、划线和想法生成 10 维度阅读分析 | 9:16 HTML 阅读报告 |
+| `read-weread-coach` | 用已读书做阶梯书单、写作引用和每日划线回顾 | 推荐 / 引用 / 回顾 |
 | `read-personal-data-harvester` | 采集用户自己的阅读、观看、收藏历史到本地数据库 | SQLite / 结构化数据 |
 
 ## 使用方式
@@ -228,6 +243,7 @@ Read Buddy 内所有 Skill 都统一使用 `read-*` 命名，目录名与 `SKILL
 | 内容消化 | `总结这篇长文`、`生成短帖和长文版` | 提炼观点、反共识、金句和叙事结构 |
 | 文档读取 | `读取这个飞书文档`、`提取 blocks` | 调用飞书 API 获取文档内容 |
 | OCR 读取 | `识别这张图`、`提取 PDF 文字` | 调用 OCR 脚本返回文本和置信度 |
+| 微信读书 | `导出我的微信读书划线`、`分析我的微信读书`、`今日笔记` | 导出笔记、生成阅读报告、抽取历史划线 |
 | X 分析 | `保存这条推文`、`分析这个博主` | 转 Markdown 或生成博主分析报告 |
 | 个人数据 | `同步我的读书记录`、`采集我的收藏` | 在本机建立个人内容历史采集管道 |
 
@@ -239,7 +255,7 @@ Read Buddy 不是一个单一爬虫，而是一组信息读取和消化 Skill。
 
 | 层次 | 说明 |
 | --- | --- |
-| 来源接入 | URL、RSS、YouTube、X、飞书、OCR、本地文件、个人平台数据 |
+| 来源接入 | URL、RSS、YouTube、X、飞书、OCR、微信读书、本地文件、个人平台数据 |
 | 内容抽取 | HTML 清洗、字幕提取、OCR、API blocks、线程解析、RSS 条目聚合 |
 | 结构化整理 | Markdown、JSON、SQLite、YAML front matter、更新列表、分析报告 |
 | 认知处理 | 摘要、翻译、热点判断、风格分析、选题提炼、长短文改写 |
@@ -251,6 +267,7 @@ Read Buddy 不是一个单一爬虫，而是一组信息读取和消化 Skill。
 - 口播创作：播客摘要或结构化笔记可交给 `read-podcast-script-generator` 改成视频口播稿。
 - 热点采集：先收集多源链接，再按来源、主题和选题价值整理。
 - X 内容：能手动就手动，自动抓取需要用户知情并接受反爬风险。
+- 微信读书：依赖官方 `weread-skills` 提供的 API Gateway 和用户自己的 `WEREAD_API_KEY`。
 - 个人数据：只处理用户自己的数据，默认本地保存，不上传。
 
 ## 适合谁
@@ -269,6 +286,7 @@ Read Buddy 的定位是公开内容读取、个人数据整理和知识消化，
 - 只读优先：默认只读取公开内容、用户提供的链接、用户本机文件或用户自己的平台数据。
 - 不做账号动作：不执行发帖、点赞、评论、关注、私信、批量互动等写操作。
 - 凭据不入库：飞书 app secret、Cookie、API Key、`.env`、浏览器登录态和个人数据库都不应提交到仓库。
+- 微信读书数据：只处理用户授权后的个人书架、划线、想法和阅读数据，报告发布前应脱敏。
 - X 风险提示：`read-x-markdown` 使用非官方接口，必须先获得用户同意，并告知可能失效或触发平台限制。
 - 个人数据本地化：`read-personal-data-harvester` 默认只在用户设备上采集和保存，不上传到第三方。
 - 小宇宙转写：`read-xiaoyuzhou-article` 需要 `ffmpeg` 和 `GROQ_API_KEY`，音频下载与转录应仅用于你有权处理的内容。
@@ -284,13 +302,13 @@ Read Buddy 的定位是公开内容读取、个人数据整理和知识消化，
 - OCR 会出错：低清图片、复杂表格、手写体和多语言混排需要人工复核。
 - 自动摘要和口播脚本不等于原文：`read-content-digest` / `read-podcast-script-generator` 会压缩、重组和改写观点，关键事实仍应回看原始文稿。
 - X 自动抓取成功率低：推荐用户手动复制内容再分析。
-- 个人数据采集需要授权：只能处理用户自己的数据，不能替代平台导出或合规审查。
+- 个人数据采集需要授权：微信读书和其他个人平台只能处理用户自己的数据，不能替代平台导出或合规审查。
 
 一个不告诉你边界在哪的阅读工具，不值得信任。
 
 ## 参考
 
-Read Buddy 汇集并整理了多个信息获取、内容读取、转写、翻译、摘要和个人数据采集 Skill。其中播客链路整合了 [SpaceZephyr/onepod-Skill](https://github.com/SpaceZephyr/onepod-Skill) 的 YouTube / 小宇宙处理能力。
+Read Buddy 汇集并整理了多个信息获取、内容读取、转写、翻译、摘要和个人数据采集 Skill。其中播客链路整合了 [SpaceZephyr/onepod-Skill](https://github.com/SpaceZephyr/onepod-Skill) 的 YouTube / 小宇宙处理能力，微信读书链路整合了 [SpaceZephyr/space-weread](https://github.com/SpaceZephyr/space-weread) 的导出、分析和回顾能力。
 
 其中部分 Skill 依赖 Chrome CDP、Feishu Open API、YouTube transcript、OCR API、RSS feed、Playwright 或本地脚本，具体依赖以各目录的 `SKILL.md` 和 `scripts/` 为准。
 

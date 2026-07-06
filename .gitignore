@@ -3,6 +3,13 @@
 .env
 **/.env
 *.log
+*.pdf
+*.html
 **/temp_*.txt
 **/temp_*.md
 **/*_transcript.md
+**/state/*.jsonl
+**/state/*.bak.jsonl
+**/cache/
+output/
+tmp/
